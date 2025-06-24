@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Crash Game - Smooth Curve</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { 
+      font-family: sans-serif; 
+      text-align: center; 
+      padding: 10px; 
+      margin: 0; 
+    }
+
+    .container {
+      max-width: 700px;
+      margin: auto;
+      padding: 10px;
+    }
+
+    canvas { 
+      background: #f9f9f9; 
+      border-radius: 8px; 
+      width: 100%; 
+      height: auto; 
+    }
+
+    #finalValue { 
+      font-size: 2em; 
+      color: blue; 
+      margin: 10px 0; 
+    }
+
+    .control-section, .bet-section { 
+      margin-bottom: 15px; 
+      display: flex; 
+      flex-wrap: wrap; 
+      justify-content: center; 
+      gap: 10px;
+    }
+
+    .card { 
+      background: #f44336; 
+      color: white; 
+      padding: 15px; 
+      margin: 20px auto; 
+      width: 90%; 
+      max-width: 300px; 
+      border-radius: 10px; 
+      font-size: 1.5em; 
+      display: none; 
+    }
+
+    .bet-result {
+      margin-top: 10px;
+      font-size: 1.2em;
+    }
+
+    .green-btn, .red-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+    }
+
+    .green-btn {
+      background-color: #4CAF50;
+    }
+
+    .green-btn:disabled {
+      background-color: #a5d6a7;
+      cursor: not-allowed;
+    }
+
+    .red-btn {
+      background-color: #f44336;
+    }
+
+    input[type="number"] {
+      padding: 5px;
+      width: 80px;
+      text-align: center;
+    }
+
+    @media (max-width: 500px) {
+      #finalValue {
+        font-size: 1.5em;
+      }
+      .green-btn, .red-btn {
+        padding: 8px 16px;
+        font-size: 0.9em;
+      }
+      input[type="number"] {
+        width: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Crash Game Curve</h2>
+
+  <div class="control-section">
+    <label>Final multiplier:</label>
+    <input type="number" id="finalX" step="0.1" value="2.0">
+    <button id="startButton" class="green-btn" onclick="startGame()">Start</button>
+  </div>
+
+  <canvas id="myCanvas" width="600" height="300"></canvas>
+  <div id="finalValue"></div>
+
+  <div class="bet-section">
+    <label>Bet amount (₹):</label>
+    <input type="number" id="betAmount" step="1" value="10">
+    <button id="betButton" class="green-btn" onclick="placeOrExitBet()">Place Bet</button>
+  </div>
+
+  <div class="bet-result" id="betResult"></div>
+  <div class="card" id="resultCard"></div>
+</div>
+
+<script>
+let betPlaced = false;
+let exited = false;
+let exitMultiplier = 0;
+let exitWinAmount = 0;
+let gameRunning = false;
+let currentMultiplier = 0;
+let currentBetAmount = 0;
+let finalX = 0;
+let points = [];
+let step = 0;
+let maxSteps = 300;
+let betPoint = null;
+let exitPoint = null;
+let curveColor = 'blue';
+
+function startGame() {
+  finalX = parseFloat(document.getElementById('finalX').value);
+  if (isNaN(finalX) || finalX <= 0) {
+    alert('Enter valid final multiplier > 0');
+    return;
+  }
+
+  const canvas = document.getElementById('myCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  document.getElementById('finalValue').textContent = '';
+  document.getElementById('resultCard').style.display = 'none';
+  document.getElementById('betResult').textContent = '';
+  canvas.style.display = 'block';
+
+  points = [];
+  step = 0;
+  betPlaced = false;
+  exited = false;
+  exitMultiplier = 0;
+  exitWinAmount = 0;
+  gameRunning = true;
+  betPoint = null;
+  exitPoint = null;
+  curveColor = 'blue';
+
+  document.getElementById('betButton').innerText = 'Place Bet';
+  document.getElementById('betButton').className = 'green-btn';
+  document.getElementById('betButton').disabled = false;
+
+  document.getElementById('startButton').disabled = true;
+  currentMultiplier = 0;
+
+  animateCurve(ctx);
+}
+
+function getY(x) {
+  let relativeX = (x - 50) / 500;
+  let y = 250 - 200 * Math.pow(relativeX, 2);
+  if (y < 50) y = 50;
+  return y;
+}
+
+function animateCurve(ctx) {
+  if (step > maxSteps) {
+    endGame();
+    return;
+  }
+
+  let x = 50 + (500 * step / maxSteps);
+  let y = getY(x);
+  points.push({ x, y });
+
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.strokeStyle = curveColor;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  if (betPoint) drawDot(ctx, betPoint.x, betPoint.y, 'green');
+  if (exitPoint) drawDot(ctx, exitPoint.x, exitPoint.y, 'red');
+
+  currentMultiplier = (finalX * step / maxSteps);
+  document.getElementById('finalValue').textContent = currentMultiplier.toFixed(2) + 'x';
+
+  if (gameRunning) {
+    step += 0.5;
+    requestAnimationFrame(() => animateCurve(ctx));
+  }
+}
+
+function drawDot(ctx, x, y, color) {
+  ctx.beginPath();
+  ctx.arc(x, y, 5, 0, 2 * Math.PI);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function placeOrExitBet() {
+  if (!gameRunning) return;
+
+  if (!betPlaced) {
+    currentBetAmount = parseFloat(document.getElementById('betAmount').value);
+    if (isNaN(currentBetAmount) || currentBetAmount <= 0) {
+      alert('Enter valid bet amount > 0');
+      return;
+    }
+    betPlaced = true;
+    betPoint = points[points.length - 1];
+    document.getElementById('betButton').innerText = 'Exit';
+    document.getElementById('betButton').className = 'red-btn';
+  } else if (!exited) {
+    exited = true;
+    exitMultiplier = currentMultiplier;
+    exitWinAmount = currentBetAmount * exitMultiplier;
+    exitPoint = points[points.length - 1];
+    document.getElementById('betResult').textContent = 
+      `✅ Exited at ${exitMultiplier.toFixed(2)}x → Won ₹${exitWinAmount.toFixed(2)}`;
+    document.getElementById('betButton').disabled = true;
+    curveColor = 'lightgrey';
+  }
+}
+
+function endGame() {
+  gameRunning = false;
+  document.getElementById('finalValue').textContent = '';
+
+  const resultCard = document.getElementById('resultCard');
+  resultCard.style.display = 'block';
+  resultCard.textContent = `🚀 Flew away at ${finalX.toFixed(2)}x!`;
+
+  if (betPlaced && !exited) {
+    document.getElementById('betResult').textContent = 
+      `💥 Crashed! Lost ₹${currentBetAmount.toFixed(2)}`;
+    curveColor = 'lightgrey';
+  }
+
+  document.getElementById('startButton').disabled = false;
+  document.getElementById('betButton').innerText = 'Place Bet';
+  document.getElementById('betButton').className = 'green-btn';
+  document.getElementById('betButton').disabled = false;
+}
+</script>
+
+</body>
+</html>
